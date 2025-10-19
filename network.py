@@ -1,0 +1,46 @@
+#!/home/ewbell/miniforge3/envs/gpdiff/bin/python
+
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class MuyGP(nn.Module):
+    def __init__(self, inDim, outDim):
+        super().__init__()
+        self.trainX = None
+        self.trainy = None
+        ymean = 0.
+        #self.ymean = nn.Linear(inDim, outDim)
+        self.l = nn.Parameter(torch.tensor(1.))
+        self.a = 1.
+        #self.a = nn.Parameter(torch.tensor(1.))
+        self.nn = 128
+
+    def kernel(self, A, B):
+        d = torch.cdist(A, B)
+        #val = self.a * torch.exp(-(d ** 2) / (2. * self.l ** 2))
+        #val = self.a * (1 + np.sqrt(3) * d / self.l) * torch.exp(-np.sqrt(3) * d / self.l)
+        val = self.a * torch.exp(-d / self.l)
+        return val
+
+    def forward(self, x):
+        dists = torch.cdist(x, self.trainX)
+        if self.training:
+            _, neighbors = torch.topk(dists, self.nn+1, largest=False, dim=1)
+            nX = self.trainX[neighbors[:,1:]]
+            ny = self.trainy[neighbors[:,1:]]
+        else:
+            _, neighbors = torch.topk(dists, self.nn, largest=False, dim=1)
+            nX = self.trainX[neighbors]
+            ny = self.trainy[neighbors]
+        auto = self.kernel(nX, nX)
+        autoCov = torch.linalg.inv(auto)
+        crossCov = self.kernel(x.unsqueeze(1), nX)
+        kWeights = crossCov @ autoCov
+        y = kWeights @ ny
+        yVar = self.a * torch.ones(x.size(0), device=x.device) - \
+            (kWeights @ crossCov.transpose(1, 2)).squeeze()
+        return y.squeeze(), yVar
+
+
