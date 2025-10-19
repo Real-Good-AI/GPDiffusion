@@ -7,6 +7,13 @@ import torchvision.transforms as T
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 
+def makeAlphaBar(t):
+    steps = torch.linspace(0, 1, t)
+    beta = 0.*steps + 0.2
+    alpha = 1 - beta
+    abar = torch.cumprod(alpha, 0)
+    return steps, alpha, abar
+
 class DiffDataset(Dataset):
     def __init__(self, t=10, maxsize=2000, train=True):
         transform = T.Compose([
@@ -31,18 +38,25 @@ class DiffDataset(Dataset):
         return self.x[idx], self.y[idx]
 
     def createTimesteps(self, data, t):
-        x = torch.empty((0, data.size(1)))
+        x = torch.empty((0, 1+data.size(1)))
         y = torch.empty((0, data.size(1)))
-        unnoised = data.clone()
-        for step in range(t):
-            #plt.imshow(unnoised[0].view(28, 28).numpy())
-            #plt.colorbar()
-            #plt.show()
-            y = torch.vstack((y, unnoised))
-            noised = unnoised + 2*torch.randn_like(unnoised) / t
-            noised = 2 * (noised - noised.min(dim=1, keepdim=True)[0]) / (noised.max(dim=1, keepdim=True)[0] - noised.min(dim=1, keepdim=True)[0]) - 1
-            x = torch.vstack((x, noised))
-            unnoised = noised.clone()
+        steps, _, abar = makeAlphaBar(t)
+        '''
+        for i in range(t):
+            xt = torch.sqrt(abar[i]) * data[0] + (1 - torch.sqrt(abar[i])) * torch.randn_like(data[0])
+            manager = plt.get_current_fig_manager()
+            plt.imshow(xt.view(28, 28).numpy())
+            plt.colorbar()
+            manager.full_screen_toggle()
+            plt.show()
+        '''
+        for n in range(20):
+            for i in range(t):
+                random = torch.randn((data.size(0), data.size(1)))
+                y = torch.vstack((y, random))
+                combine = torch.sqrt(abar[i]) * data + (1 - torch.sqrt(abar[i])) * random
+                inp = torch.hstack((combine, steps[i].unsqueeze(0).expand(combine.size(0), 1)))
+                x = torch.vstack((x, inp))
         return x, y
 
 

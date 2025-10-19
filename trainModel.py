@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
-from features import DiffDataset
+from features import DiffDataset, makeAlphaBar
 from network import MuyGP
 from torch.utils.data import DataLoader
 
@@ -15,14 +15,14 @@ timesteps = 10
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     data = DiffDataset(t=timesteps, maxsize=1000, train=True)
-    loader = DataLoader(data, batch_size=1024, shuffle=True, pin_memory=True)
+    loader = DataLoader(data, batch_size=512, shuffle=True, pin_memory=True)
 
-    gp = MuyGP(784, 784).to(device)
+    gp = MuyGP(785, 784).to(device)
     gp.trainX = data.x.to(device)
     gp.trainy = data.y.to(device)
 
     vdata = DiffDataset(t=timesteps, maxsize=100, train=False)
-    vloader = DataLoader(vdata, batch_size=4096, pin_memory=True)
+    vloader = DataLoader(vdata, batch_size=512, pin_memory=True)
     
     epoch = 0
     epochLoss = []
@@ -62,12 +62,20 @@ if __name__ == "__main__":
         print(epoch, epochLoss[-1], validsLoss[-1])
         print(gp.a)
         print(gp.l)
-
+    
     with torch.no_grad():
         gp.eval()
-        test = torch.randn((10, 784), device=device)
-        for t in range(timesteps):
-            test, var = gp(test)
-            img = test[0].view(28, 28).detach().cpu().numpy()
+        test = torch.randn((3, 784), device=device)
+        steps, alpha, abar = makeAlphaBar(timesteps)
+        steps = steps.to(device)
+        alpha = alpha.to(device)
+        abar = abar.to(device)
+        for t in reversed(range(timesteps)):
+            eps, var = gp(torch.hstack((test, steps[t].unsqueeze(0).expand(test.size(0),1))))
+            test = 1/torch.sqrt(alpha[t]) * (test - (1-alpha[t])/torch.sqrt(1-abar[t]) * eps)
+        
+        for i in range(test.size(0)):
+            img = test[i].view(28, 28).detach().cpu().numpy()
             plt.imshow(img)
             plt.show()
+        
