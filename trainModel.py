@@ -7,7 +7,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from features import DiffDataset, makeAlphaBar
-from network import MuyGP
+from network import MuyGP, NN
 from torch.utils.data import DataLoader
 
 timesteps = 10
@@ -16,11 +16,12 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     data = DiffDataset(t=timesteps, maxsize=1000, train=True)
     loader = DataLoader(data, batch_size=512, shuffle=True, pin_memory=True)
-
+    
     gp = MuyGP(785, 784).to(device)
     gp.trainX = data.x.to(device)
     gp.trainy = data.y.to(device)
-
+    
+    #gp = NN(785, 784).to(device)
     vdata = DiffDataset(t=timesteps, maxsize=100, train=False)
     vloader = DataLoader(vdata, batch_size=512, pin_memory=True)
     
@@ -37,7 +38,6 @@ if __name__ == "__main__":
             y = y.to(device)
             gpopt.zero_grad()
             output, var = gp(x)
-            var = torch.clamp(var, min=1e-10)
             errors = (output - y) ** 2. / var.unsqueeze(1)
             loss = errors.sum() + y.size(1) * torch.log(var).sum()
             loss.backward()
@@ -53,7 +53,6 @@ if __name__ == "__main__":
                 x = x.to(device)
                 y = y.to(device)
                 output, var = gp(x)
-                var = torch.clamp(var, min=1e-10)
                 errors = (output - y) ** 2. #/ var.unsqueeze(1)
                 loss = errors.sum() #+ y.size(1) * torch.log(var).sum()
                 validLoss += loss.item()

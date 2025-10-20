@@ -22,13 +22,16 @@ class DiffDataset(Dataset):
             T.Lambda(lambda x: torch.flatten(x))
         ])
         mnist = torchvision.datasets.MNIST(root="./data", train=train, download=True, transform=transform)
-        images = torch.empty((0, 784))
+        images = torch.zeros((maxsize, 784))
+        i = 0
         for image, label in mnist:
-            images = torch.vstack((images, image))
-            if images.size(0) % 100 == 0:
-                print(images.size(0))
-            if images.size(0) >= maxsize:
+            images[i] = image
+            i += 1
+            if i % 100 == 0:
+                print(i)
+            if i >= maxsize:
                 break
+        images = images[:i]
         self.x, self.y = self.createTimesteps(images, t)
 
     def __len__(self):
@@ -37,9 +40,9 @@ class DiffDataset(Dataset):
     def __getitem__(self, idx):
         return self.x[idx], self.y[idx]
 
-    def createTimesteps(self, data, t):
-        x = torch.empty((0, 1+data.size(1)))
-        y = torch.empty((0, data.size(1)))
+    def createTimesteps(self, data, t, reps = 10):
+        x = torch.zeros((t*reps*data.size(0), 1+data.size(1)))
+        y = torch.zeros((t*reps*data.size(0), data.size(1)))
         steps, _, abar = makeAlphaBar(t)
         '''
         for i in range(t):
@@ -50,13 +53,16 @@ class DiffDataset(Dataset):
             manager.full_screen_toggle()
             plt.show()
         '''
-        for n in range(20):
+        size = data.size(0)
+        for n in range(reps):
             for i in range(t):
+                start = n*t*size + i*size
+                end = n*t*size + (i+1)*size
                 random = torch.randn((data.size(0), data.size(1)))
-                y = torch.vstack((y, random))
+                y[start:end] = random
                 combine = torch.sqrt(abar[i]) * data + (1 - torch.sqrt(abar[i])) * random
                 inp = torch.hstack((combine, steps[i].unsqueeze(0).expand(combine.size(0), 1)))
-                x = torch.vstack((x, inp))
+                x[start:end] = inp
         return x, y
 
 

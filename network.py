@@ -45,3 +45,18 @@ class MuyGP(nn.Module):
         return (y + ymean).squeeze(), yVar
 
 
+class NN(nn.Module):
+    def __init__(self, inDim, outDim):
+        super().__init__()
+        self.l = 1.
+        self.a = 1.
+        self.fcnn = nn.Sequential(
+            nn.Linear(inDim, outDim),
+            nn.LeakyReLU(),
+            nn.Linear(outDim, outDim)
+        )
+
+    def forward(self, x):
+        x = self.fcnn(x)
+        return x, torch.ones_like(x)
+    
