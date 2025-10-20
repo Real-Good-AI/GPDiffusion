@@ -8,11 +8,12 @@ import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 
 def makeAlphaBar(t):
-    steps = torch.linspace(0, 1, t)
-    beta = 0.*steps + 0.2
-    alpha = 1 - beta
-    abar = torch.cumprod(alpha, 0)
-    return steps, alpha, abar
+    steps = torch.linspace(0, 1, t+1)
+    abar = torch.cos(((steps + 8e-3)/(1 + 8e-3)) * torch.pi / 2) ** 2
+    abar = torch.clamp(abar / abar[0], min=1e-3)
+    alpha = abar[1:] / abar[:-1]
+    
+    return steps, alpha, abar[1:]
 
 class DiffDataset(Dataset):
     def __init__(self, t=10, maxsize=2000, train=True):
@@ -40,7 +41,7 @@ class DiffDataset(Dataset):
     def __getitem__(self, idx):
         return self.x[idx], self.y[idx]
 
-    def createTimesteps(self, data, t, reps = 10):
+    def createTimesteps(self, data, t, reps = 1):
         x = torch.zeros((t*reps*data.size(0), 1+data.size(1)))
         y = torch.zeros((t*reps*data.size(0), data.size(1)))
         steps, _, abar = makeAlphaBar(t)
@@ -58,7 +59,7 @@ class DiffDataset(Dataset):
             for i in range(t):
                 start = n*t*size + i*size
                 end = n*t*size + (i+1)*size
-                random = torch.randn((data.size(0), data.size(1)))
+                random = torch.randn_like(data)
                 y[start:end] = random
                 combine = torch.sqrt(abar[i]) * data + (1 - torch.sqrt(abar[i])) * random
                 inp = torch.hstack((combine, steps[i].unsqueeze(0).expand(combine.size(0), 1)))

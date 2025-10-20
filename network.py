@@ -18,13 +18,14 @@ class MuyGP(nn.Module):
 
     def kernel(self, A, B):
         d = torch.cdist(A, B)
-        #val = self.a * torch.exp(-(d ** 2) / (2. * self.l ** 2))
+        val = self.a * torch.exp(-(d ** 2) / (2. * self.l ** 2))
         #val = self.a * (1 + np.sqrt(3) * d / self.l) * torch.exp(-np.sqrt(3) * d / self.l)
-        val = self.a * torch.exp(-d / self.l)
+        #val = self.a * torch.exp(-d / self.l)
         return val
 
     def forward(self, x):
         ymean = self.ymean(x).unsqueeze(1)
+        #ymean = 0.
         dists = torch.cdist(x, self.trainX)
         if self.training:
             _, neighbors = torch.topk(dists, self.nn+1, largest=False, dim=1)
