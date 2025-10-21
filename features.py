@@ -7,6 +7,13 @@ import torchvision.transforms as T
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 
+def makeTimeEmbedding(t, d):
+    halfd = d // 2
+    freqs = torch.exp(-np.log(10000) * torch.arange(0, halfd) / halfd)
+    angles = t * freqs
+    emb = torch.cat([torch.sin(angles), torch.cos(angles)], dim=-1)
+    return emb
+    
 def makeAlphaBar(t):
     steps = torch.linspace(0, 1, t+1)
     abar = torch.cos(((steps + 8e-3)/(1 + 8e-3)) * torch.pi / 2) ** 2
@@ -42,7 +49,7 @@ class DiffDataset(Dataset):
         return self.x[idx], self.y[idx]
 
     def createTimesteps(self, data, t, reps = 1):
-        x = torch.zeros((t*reps*data.size(0), 1+data.size(1)))
+        x = torch.zeros((t*reps*data.size(0), data.size(1)))
         y = torch.zeros((t*reps*data.size(0), data.size(1)))
         steps, _, abar = makeAlphaBar(t)
         '''
@@ -61,8 +68,8 @@ class DiffDataset(Dataset):
                 end = n*t*size + (i+1)*size
                 random = torch.randn_like(data)
                 y[start:end] = random
-                combine = torch.sqrt(abar[i]) * data + (1 - torch.sqrt(abar[i])) * random
-                inp = torch.hstack((combine, steps[i].unsqueeze(0).expand(combine.size(0), 1)))
+                inp = torch.sqrt(abar[i]) * data + (1 - torch.sqrt(abar[i])) * random +\
+                    makeTimeEmbedding(t+1, data.size(1))
                 x[start:end] = inp
         return x, y
 
