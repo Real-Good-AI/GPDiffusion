@@ -7,22 +7,7 @@ import torchvision.transforms as T
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 
-def makeTimeEmbedding(t, d):
-    halfd = d // 2
-    freqs = torch.exp(-np.log(10000) * torch.arange(0, halfd) / halfd)
-    angles = t * freqs
-    emb = torch.cat([torch.sin(angles), torch.cos(angles)], dim=-1)
-    return emb
-    
-def makeAlphaBar(t):
-    steps = torch.linspace(0, 1, t+1)
-    abar = torch.cos(((steps + 8e-3)/(1 + 8e-3)) * torch.pi / 2) ** 2
-    abar = torch.clamp(abar / abar[0], min=1e-3)
-    alpha = abar[1:] / abar[:-1]
-    
-    return steps, alpha, abar[1:]
-
-class DiffDataset(Dataset):
+class FlowDataset(Dataset):
     def __init__(self, t=10, maxsize=2000, train=True):
         transform = T.Compose([
             T.ToTensor(),
@@ -30,17 +15,17 @@ class DiffDataset(Dataset):
             T.Lambda(lambda x: torch.flatten(x))
         ])
         mnist = torchvision.datasets.MNIST(root="./data", train=train, download=True, transform=transform)
-        images = torch.zeros((maxsize, 784))
+        images = torch.zeros((60000, 784))
         i = 0
         for image, label in mnist:
             images[i] = image
             i += 1
-            if i % 100 == 0:
+            if i % 1000 == 0:
                 print(i)
-            if i >= maxsize:
-                break
         images = images[:i]
-        self.x, self.y = self.createTimesteps(images, t)
+        self.x = torch.zeros((maxsize, images.size(1)))
+        self.y = torch.zeros((maxsize, images.size(1)))
+        self.createTimesteps(images, t)
 
     def __len__(self):
         return self.x.size(0)
@@ -48,29 +33,19 @@ class DiffDataset(Dataset):
     def __getitem__(self, idx):
         return self.x[idx], self.y[idx]
 
-    def createTimesteps(self, data, t, reps = 1):
-        x = torch.zeros((t*reps*data.size(0), data.size(1)))
-        y = torch.zeros((t*reps*data.size(0), data.size(1)))
-        steps, _, abar = makeAlphaBar(t)
-        '''
-        for i in range(t):
-            xt = torch.sqrt(abar[i]) * data[0] + (1 - torch.sqrt(abar[i])) * torch.randn_like(data[0])
-            manager = plt.get_current_fig_manager()
-            plt.imshow(xt.view(28, 28).numpy())
-            plt.colorbar()
-            manager.full_screen_toggle()
-            plt.show()
-        '''
-        size = data.size(0)
-        for n in range(reps):
-            for i in range(t):
-                start = n*t*size + i*size
-                end = n*t*size + (i+1)*size
-                random = torch.randn_like(data)
-                y[start:end] = random
-                inp = torch.sqrt(abar[i]) * data + (1 - torch.sqrt(abar[i])) * random +\
-                    makeTimeEmbedding(t+1, data.size(1))
-                x[start:end] = inp
-        return x, y
-
+    def createTimesteps(self, data, t):
+        i = 0
+        while i < self.x.size(0):
+            row = data[np.random.randint(data.size(0))]
+            noise = torch.randn_like(row)
+            for j in range(np.random.randint(t)):
+                unnoised = row * (t-j)/t + noise * j/t
+                noised = row * (t-j-1)/t + noise * (j+1)/t
+                self.x[i] = noised
+                self.y[i] = unnoised
+                i += 1
+                if i >= self.x.size(0):
+                    break
+        print(self.x)
+        print(self.y)
 

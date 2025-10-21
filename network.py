@@ -12,9 +12,9 @@ class MuyGP(nn.Module):
         self.trainX = None
         self.trainy = None
         self.ymean = nn.Linear(inDim, outDim)
-        self.l = nn.Parameter(torch.tensor(50.))
+        self.l = nn.Parameter(torch.tensor(1.))
         #self.a = 1.
-        self.a = nn.Parameter(torch.tensor(50.))
+        self.a = nn.Parameter(torch.tensor(1.))
         self.nn = 128
 
     def kernel(self, A, B):
@@ -37,7 +37,7 @@ class MuyGP(nn.Module):
             nX = self.trainX[neighbors]
             ny = self.trainy[neighbors]
             print(_.min())
-            #plt.imshow(ymean[0,:].view(28, 28).detach().cpu().numpy())
+            #plt.imshow(x[0,:].view(28, 28).detach().cpu().numpy())
             #plt.show()
         ny = ny - ymean
         auto = self.kernel(nX, nX)
