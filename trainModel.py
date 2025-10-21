@@ -8,7 +8,7 @@ from features import FlowDataset
 from network import MuyGP, NN
 from torch.utils.data import DataLoader
 
-timesteps = 10
+timesteps = 100
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     validsLoss = []
     gpopt = optim.AdamW(gp.parameters(), lr=1e-1, weight_decay=1e-2)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(gpopt, patience=2, cooldown=4)
-    
+    '''
     while gpopt.param_groups[0]["lr"] > 1e-4 and epoch < 100:
         print(gpopt.param_groups[0]["lr"])
         runningLoss = 0.
@@ -63,16 +63,19 @@ if __name__ == "__main__":
         print(epoch, epochLoss[-1], validsLoss[-1])
         print(gp.a)
         print(gp.l)
-    
+    '''
     
     with torch.no_grad():
         gp.eval()
         test = torch.randn((10, 784), device=device)
-        for t in range(timesteps*10):
-            step, var = gp(test)
-            test = (timesteps-1)/(timesteps) * test + 1/timesteps * step
+        temp = test
+        for t in range(timesteps):
+            out, var = gp(temp)
+            temp = (timesteps-t-1)/timesteps * test + (t+1)/timesteps * out
+        test = temp
         for i in range(test.size(0)):
             img = test[i].view(28, 28).detach().cpu().numpy()
             plt.imshow(img)
             plt.show()
+
         
