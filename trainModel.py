@@ -1,16 +1,14 @@
 #!/home/ewbell/miniforge3/envs/gpdiff/bin/python
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
-import torch.nn.functional as F
 from features import FlowDataset
 from network import MuyGP, NN
 from torch.utils.data import DataLoader
 
-timesteps = 100
+timesteps = 10
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -22,15 +20,16 @@ if __name__ == "__main__":
     gp.trainy = data.y.to(device)
     
     #gp = NN(784, 784).to(device)
+    
     vdata = FlowDataset(t=timesteps, maxsize=10000, train=False)
     vloader = DataLoader(vdata, batch_size=512, pin_memory=True)
-    '''
+    
     epoch = 0
     epochLoss = []
     validsLoss = []
-    gpopt = optim.AdamW(gp.parameters(), lr=1e-2, weight_decay=1e-2)
+    gpopt = optim.AdamW(gp.parameters(), lr=1e-1, weight_decay=1e-2)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(gpopt, patience=2, cooldown=4)
-    #scheduler = optim.lr_scheduler.ExponentialLR(gpopt, gamma=0.87)
+    
     while gpopt.param_groups[0]["lr"] > 1e-4 and epoch < 100:
         print(gpopt.param_groups[0]["lr"])
         runningLoss = 0.
@@ -58,22 +57,22 @@ if __name__ == "__main__":
                 var = torch.clamp(var, min=1e-10)
                 errors = (output - y) ** 2. #/ var.unsqueeze(1)
                 loss = errors.sum() #+ y.size(1) * torch.log(var).sum()
-                print(loss)
                 validLoss += loss.item()
             validsLoss.append(validLoss)
             gp.train()
         print(epoch, epochLoss[-1], validsLoss[-1])
         print(gp.a)
         print(gp.l)
-    '''
+    
+    
     with torch.no_grad():
         gp.eval()
-        test = torch.randn((3, 784), device=device)
+        test = torch.randn((10, 784), device=device)
         for t in range(timesteps*10):
             step, var = gp(test)
             test = (timesteps-1)/(timesteps) * test + 1/timesteps * step
         for i in range(test.size(0)):
-            img = step[i].view(28, 28).detach().cpu().numpy()
+            img = test[i].view(28, 28).detach().cpu().numpy()
             plt.imshow(img)
             plt.show()
         

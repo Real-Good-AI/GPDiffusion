@@ -1,11 +1,7 @@
-#!/home/ewbell/miniforge3/envs/gpdiff/bin/python
-
-import numpy as np
 import torch
 import torchvision
 import torchvision.transforms as T
-import matplotlib.pyplot as plt
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
 class FlowDataset(Dataset):
     def __init__(self, t=10, maxsize=2000, train=True):
