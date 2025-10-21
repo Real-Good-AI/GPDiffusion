@@ -10,28 +10,28 @@ from features import FlowDataset
 from network import MuyGP, NN
 from torch.utils.data import DataLoader
 
-timesteps = 40
+timesteps = 100
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     data = FlowDataset(t=timesteps, maxsize=100000, train=True)
     loader = DataLoader(data, batch_size=512, shuffle=True, pin_memory=True)
     
-    #gp = MuyGP(784, 784).to(device)
-    #gp.trainX = data.x.to(device)
-    #gp.trainy = data.y.to(device)
+    gp = MuyGP(784, 784).to(device)
+    gp.trainX = data.x.to(device)
+    gp.trainy = data.y.to(device)
     
-    gp = NN(784, 784).to(device)
+    #gp = NN(784, 784).to(device)
     vdata = FlowDataset(t=timesteps, maxsize=10000, train=False)
     vloader = DataLoader(vdata, batch_size=512, pin_memory=True)
-    
+    '''
     epoch = 0
     epochLoss = []
     validsLoss = []
-    gpopt = optim.AdamW(gp.parameters(), lr=1e-3, weight_decay=1e-2)
+    gpopt = optim.AdamW(gp.parameters(), lr=1e-2, weight_decay=1e-2)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(gpopt, patience=2, cooldown=4)
     #scheduler = optim.lr_scheduler.ExponentialLR(gpopt, gamma=0.87)
-    while gpopt.param_groups[0]["lr"] > 1e-5 and epoch < 100:
+    while gpopt.param_groups[0]["lr"] > 1e-4 and epoch < 100:
         print(gpopt.param_groups[0]["lr"])
         runningLoss = 0.
         for x, y in loader:
@@ -65,14 +65,15 @@ if __name__ == "__main__":
         print(epoch, epochLoss[-1], validsLoss[-1])
         print(gp.a)
         print(gp.l)
-    
+    '''
     with torch.no_grad():
         gp.eval()
         test = torch.randn((3, 784), device=device)
-        for t in range(timesteps):
-            test, var = gp(test)
+        for t in range(timesteps*10):
+            step, var = gp(test)
+            test = (timesteps-1)/(timesteps) * test + 1/timesteps * step
         for i in range(test.size(0)):
-            img = test[i].view(28, 28).detach().cpu().numpy()
+            img = step[i].view(28, 28).detach().cpu().numpy()
             plt.imshow(img)
             plt.show()
         

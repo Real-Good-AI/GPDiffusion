@@ -23,9 +23,10 @@ class FlowDataset(Dataset):
             if i % 1000 == 0:
                 print(i)
         images = images[:i]
-        self.x = torch.zeros((maxsize, images.size(1)))
-        self.y = torch.zeros((maxsize, images.size(1)))
-        self.createTimesteps(images, t)
+        self.y = images[torch.randint(0, images.size(0), (maxsize,))]
+        noise = torch.randn_like(self.y)
+        interp = torch.rand((self.y.size(0), 1))
+        self.x = interp * self.y + (1-interp) * noise
 
     def __len__(self):
         return self.x.size(0)
@@ -33,19 +34,4 @@ class FlowDataset(Dataset):
     def __getitem__(self, idx):
         return self.x[idx], self.y[idx]
 
-    def createTimesteps(self, data, t):
-        i = 0
-        while i < self.x.size(0):
-            row = data[np.random.randint(data.size(0))]
-            noise = torch.randn_like(row)
-            for j in range(np.random.randint(t)):
-                unnoised = row * (t-j)/t + noise * j/t
-                noised = row * (t-j-1)/t + noise * (j+1)/t
-                self.x[i] = noised
-                self.y[i] = unnoised
-                i += 1
-                if i >= self.x.size(0):
-                    break
-        print(self.x)
-        print(self.y)
-
+    

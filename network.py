@@ -12,9 +12,9 @@ class MuyGP(nn.Module):
         self.trainX = None
         self.trainy = None
         self.ymean = nn.Linear(inDim, outDim)
-        self.l = nn.Parameter(torch.tensor(1.))
+        self.l = nn.Parameter(torch.tensor(15.))
         #self.a = 1.
-        self.a = nn.Parameter(torch.tensor(1.))
+        self.a = nn.Parameter(torch.tensor(0.5))
         self.nn = 128
 
     def kernel(self, A, B):
@@ -25,8 +25,8 @@ class MuyGP(nn.Module):
         return val
 
     def forward(self, x):
-        ymean = self.ymean(x).unsqueeze(1)
-        #ymean = 0.
+        #ymean = self.ymean(x).unsqueeze(1)
+        ymean = 0.
         dists = torch.cdist(x, self.trainX)
         if self.training:
             _, neighbors = torch.topk(dists, self.nn+1, largest=False, dim=1)
