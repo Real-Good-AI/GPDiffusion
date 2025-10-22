@@ -20,8 +20,8 @@ if __name__ == "__main__":
     gp.trainy = data.y.to(device)
     
     #gp = NN(784, 784).to(device)
-    
-    vdata = FlowDataset(t=timesteps, maxsize=10000, train=False)
+    '''
+    vdata = FlowDataset(t=timesteps, maxsize=1000, train=False)
     vloader = DataLoader(vdata, batch_size=512, pin_memory=True)
     
     epoch = 0
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     validsLoss = []
     gpopt = optim.AdamW(gp.parameters(), lr=1e-1, weight_decay=1e-2)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(gpopt, patience=2, cooldown=4)
-    '''
+    
     while gpopt.param_groups[0]["lr"] > 1e-4 and epoch < 100:
         print(gpopt.param_groups[0]["lr"])
         runningLoss = 0.
@@ -70,10 +70,13 @@ if __name__ == "__main__":
         test = torch.randn((10, 784), device=device)
         temp = test
         for t in range(timesteps):
+            plt.imshow(temp[0].view(28, 28).detach().cpu().numpy())
+            plt.show()
             out, var = gp(temp)
             temp = (timesteps-t-1)/timesteps * test + (t+1)/timesteps * out
         test = temp
         for i in range(test.size(0)):
+            print("IMG")
             img = test[i].view(28, 28).detach().cpu().numpy()
             plt.imshow(img)
             plt.show()
