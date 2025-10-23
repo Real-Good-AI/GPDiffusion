@@ -8,8 +8,9 @@ class MuyGP(nn.Module):
         super().__init__()
         self.trainX = None
         self.trainy = None
-        self.l = nn.Parameter(torch.tensor(77.6))
-        self.a = nn.Parameter(torch.tensor(0.455))
+        self.ymean = None
+        self.l = nn.Parameter(torch.tensor(1.))
+        self.a = nn.Parameter(torch.tensor(1.))
         self.nn = 128
 
     def kernel(self, A, B):
@@ -20,6 +21,8 @@ class MuyGP(nn.Module):
         return val
 
     def forward(self, x):
+        #ymean = self.ymean(x).unsqueeze(1)
+        ymean = self.ymean
         dists = torch.cdist(x, self.trainX)
         if self.training:
             _, neighbors = torch.topk(dists, self.nn+1, largest=False, dim=1)
@@ -29,10 +32,10 @@ class MuyGP(nn.Module):
             _, neighbors = torch.topk(dists, self.nn, largest=False, dim=1)
             nX = self.trainX[neighbors]
             ny = self.trainy[neighbors]
-            print(_[:,0])
-            plt.imshow(self.trainy[neighbors[0,0]].view(28,28).detach().cpu().numpy())
-            plt.show()
-        ny = ny + 1e-2 * torch.randn_like(ny)
+            #print(_[:,0])
+            #plt.imshow(self.trainy[neighbors[0,0]].view(5,5).detach().cpu().numpy())
+            #plt.show()
+        ny = ny + 1e-2 * torch.randn_like(ny) - ymean
         auto = self.kernel(nX, nX)
         autoCov = torch.linalg.inv(auto)
         crossCov = self.kernel(x.unsqueeze(1), nX)
@@ -40,7 +43,7 @@ class MuyGP(nn.Module):
         y = kWeights @ ny
         yVar = self.a * torch.ones(x.size(0), device=x.device) - \
             (kWeights @ crossCov.transpose(1, 2)).squeeze()
-        return y.squeeze(), yVar
+        return (y + ymean).squeeze(), yVar
 
 
 class NN(nn.Module):
