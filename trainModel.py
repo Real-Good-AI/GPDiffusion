@@ -1,5 +1,6 @@
 #!/home/ewbell/miniforge3/envs/gpdiff/bin/python
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -10,23 +11,22 @@ from network import MuyGP, NN
 from torch.utils.data import DataLoader
 
 timesteps = 100
-kernel = 8
+kernel = 25 #MUST be odd, otherwise there's no center pixel
 imgsize = 64
 nimg = 2
-dilation = 2
-stride = 1
+dilation = 1
 
 def trainModel(loader, gp, device):
-    vdata = FlowDataset(t=timesteps, maxsize=10000, train=False, slicesize=kernel, dilation=dilation)
+    vdata = FlowDataset(t=timesteps, maxsize=10000, train=False, kernel=kernel, dilation=dilation)
     vloader = DataLoader(vdata, batch_size=512, pin_memory=True)
     
     epoch = 0
     epochLoss = []
     validsLoss = []
-    gpopt = optim.AdamW(gp.parameters(), lr=1e-1, weight_decay=1e-2)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(gpopt, patience=2, cooldown=4)
+    gpopt = optim.AdamW(gp.parameters(), lr=1e-2, weight_decay=1e-2)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(gpopt, patience=1, cooldown=4)
     
-    while gpopt.param_groups[0]["lr"] > 1e-4 and epoch < 5:
+    while gpopt.param_groups[0]["lr"] > 1e-4 and epoch < 20:
         print(gpopt.param_groups[0]["lr"])
         runningLoss = 0.
         for x, y in loader:
@@ -63,8 +63,8 @@ def trainModel(loader, gp, device):
     
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    data = FlowDataset(t=timesteps, maxsize=100000, train=True, slicesize=kernel, dilation=dilation)
-    loader = DataLoader(data, batch_size=512, shuffle=True, pin_memory=True)
+    data = FlowDataset(t=timesteps, maxsize=100000, train=True, kernel=kernel, dilation=dilation)
+    loader = DataLoader(data, batch_size=2048, shuffle=True, pin_memory=True)
     
     gp = MuyGP(kernel*kernel, kernel*kernel).to(device)
     gp.trainX = data.x.to(device)
@@ -76,23 +76,23 @@ if __name__ == "__main__":
     
     with torch.no_grad():
         gp.eval()
-        fold = nn.Fold(output_size=imgsize, kernel_size=kernel, stride=stride, dilation=dilation)
-        unfold = nn.Unfold(kernel_size=kernel, stride=stride, dilation=dilation)
-        norm = fold(unfold(torch.ones((1, 1, imgsize, imgsize), device=device)))
         test = torch.randn((nimg, imgsize, imgsize), device=device)
-        temp = test 
+        temp = test.clone() 
         for t in range(timesteps):
-            convs = unfold(temp.unsqueeze(1)).transpose(1, 2).reshape(-1, kernel*kernel)
+            convs = F.unfold(temp.unsqueeze(1), kernel_size=kernel, dilation=dilation, padding=((kernel-1) * dilation+1) // 2)
+            convs = convs.transpose(1, 2).reshape(-1, kernel*kernel)
             convsout, var = gp(convs)
-            out = fold(convsout.reshape(nimg, -1, kernel*kernel).transpose(1, 2)) / norm
-            out = out.squeeze()
-            temp = (timesteps-t-1)/timesteps * test + (t+1)/timesteps * out
+            var = var.reshape(nimg, imgsize, imgsize)
+            out = convsout.reshape(nimg, imgsize, imgsize)
+            combo = np.sin((t+1)/timesteps * np.pi/2)
+            temp = (1-combo) * test + combo * out
+            '''
             if t % 10 == 0:
                 print(t)
-                plt.imshow(temp[0].detach().cpu().numpy())
+                plt.imshow(out[0].detach().cpu().numpy())
                 plt.colorbar()
                 plt.show()
-
+            '''
         test = temp
         for i in range(test.size(0)):
             img = test[i].view(imgsize, imgsize).detach().cpu().numpy()

@@ -15,6 +15,7 @@ class MuyGP(nn.Module):
 
     def kernel(self, A, B):
         d = torch.cdist(A, B)
+        d = d / np.sqrt(A.size(-1))
         #val = self.a * torch.exp(-(d ** 2) / (2. * self.l ** 2))
         #val = self.a * (1 + np.sqrt(3) * d / self.l) * torch.exp(-np.sqrt(3) * d / self.l)
         val = self.a * torch.exp(-d / self.l)
@@ -32,7 +33,7 @@ class MuyGP(nn.Module):
             _, neighbors = torch.topk(dists, self.nn, largest=False, dim=1)
             nX = self.trainX[neighbors]
             ny = self.trainy[neighbors]
-            #print(_[:,0])
+            print(_[:,0])
             #plt.imshow(self.trainy[neighbors[0,0]].view(5,5).detach().cpu().numpy())
             #plt.show()
         ny = ny + 1e-2 * torch.randn_like(ny) - ymean
@@ -43,7 +44,7 @@ class MuyGP(nn.Module):
         y = kWeights @ ny
         yVar = self.a * torch.ones(x.size(0), device=x.device) - \
             (kWeights @ crossCov.transpose(1, 2)).squeeze()
-        return (y + ymean).squeeze(), yVar
+        return (y + ymean).squeeze(1), yVar
 
 
 class NN(nn.Module):
