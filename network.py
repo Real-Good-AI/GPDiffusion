@@ -9,8 +9,8 @@ class MuyGP(nn.Module):
         self.trainX = None
         self.trainy = None
         self.ymean = None
-        self.l = nn.Parameter(torch.tensor(1.))
-        self.a = nn.Parameter(torch.tensor(1.))
+        self.l = nn.Parameter(torch.tensor(2.5))
+        self.a = nn.Parameter(torch.tensor(0.5))
         self.nn = 128
 
     def kernel(self, A, B):

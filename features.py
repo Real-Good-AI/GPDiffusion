@@ -25,14 +25,16 @@ class FlowDataset(Dataset):
             T.Normalize((0.5,), (0.5,))
         ])
         '''
-        dataset = torchvision.datasets.MNIST(root="./data", train=train, download=True, transform=transform)
-        #dataset = torchvision.datasets.FashionMNIST(root="./data", train=train, download=True, transform=transform)
+        #dataset = torchvision.datasets.MNIST(root="./data", train=train, download=True, transform=transform)
+        dataset = torchvision.datasets.FashionMNIST(root="./data", train=train, download=True, transform=transform)
         #dataset = torchvision.datasets.SVHN(root="./data", split=keyword, download=True, transform=transform)
-        images = torch.zeros((len(dataset), imgsize, imgsize))
+        images = torch.zeros((maxsize, imgsize, imgsize))
         i = 0
         for image, label in dataset:
             images[i] = image.squeeze()
             i += 1
+            if i >= maxsize:
+                break
             if i % 1000 == 0:
                 #plt.imshow(images[i-1].numpy())
                 #plt.colorbar()
@@ -43,18 +45,15 @@ class FlowDataset(Dataset):
         padding = effsize // 2
         padimages = F.pad(images,(padding, padding, padding, padding))
         
-        whichimg = torch.randint(0, len(dataset), (maxsize,))
-        y = torch.randint(0, imgsize, (maxsize,))
-        x = torch.randint(0, imgsize, (maxsize,))
-        
-        self.y = images[whichimg, y, x].unsqueeze(1)
+        idx = torch.cartesian_prod(torch.arange(maxsize), torch.arange(imgsize), torch.arange(imgsize))
+        self.y = images[idx[:,0], idx[:,1], idx[:,2]].unsqueeze(1)
         drawnslices = torch.stack([
-            padimages[whichimg[i], y[i]:y[i]+2*padding+1:dilation, x[i]:x[i]+2*padding+1:dilation]
-            for i in range(maxsize)
-        ]).reshape(maxsize, kernel*kernel)
+            padimages[idx[i,0], idx[i,1]:idx[i,1]+effsize:dilation, idx[i,2]:idx[i,2]+effsize:dilation]
+            for i in range(idx.size(0))
+        ]).reshape(maxsize*imgsize*imgsize, kernel*kernel)
         noise = torch.randn_like(drawnslices)
         beta = Beta(2., 1.)
-        interp = beta.sample((maxsize, 1))
+        interp = beta.sample((maxsize*imgsize*imgsize, 1))
         self.x = interp * drawnslices + (1-interp) * noise
         
     def __len__(self):

@@ -11,22 +11,22 @@ from network import MuyGP, NN
 from torch.utils.data import DataLoader
 
 timesteps = 100
-kernel = 25 #MUST be odd, otherwise there's no center pixel
-imgsize = 64
+kernel = 5 #MUST be odd, otherwise there's no center pixel
+imgsize = 50
 nimg = 2
 dilation = 1
 
 def trainModel(loader, gp, device):
-    vdata = FlowDataset(t=timesteps, maxsize=10000, train=False, kernel=kernel, dilation=dilation)
+    vdata = FlowDataset(t=timesteps, maxsize=10, train=False, kernel=kernel, dilation=dilation)
     vloader = DataLoader(vdata, batch_size=512, pin_memory=True)
     
     epoch = 0
     epochLoss = []
     validsLoss = []
     gpopt = optim.AdamW(gp.parameters(), lr=1e-2, weight_decay=1e-2)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(gpopt, patience=1, cooldown=4)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(gpopt, patience=0, cooldown=4)
     
-    while gpopt.param_groups[0]["lr"] > 1e-4 and epoch < 20:
+    while gpopt.param_groups[0]["lr"] > 1e-7 and epoch < 10:
         print(gpopt.param_groups[0]["lr"])
         runningLoss = 0.
         for x, y in loader:
@@ -63,7 +63,7 @@ def trainModel(loader, gp, device):
     
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    data = FlowDataset(t=timesteps, maxsize=100000, train=True, kernel=kernel, dilation=dilation)
+    data = FlowDataset(t=timesteps, maxsize=1000, train=True, kernel=kernel, dilation=dilation)
     loader = DataLoader(data, batch_size=2048, shuffle=True, pin_memory=True)
     
     gp = MuyGP(kernel*kernel, kernel*kernel).to(device)
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     gp.ymean = gp.trainy.mean(dim=0, keepdim=True)
     #gp = NN(784, 784).to(device)
 
-    trainModel(loader, gp, device)
+    #trainModel(loader, gp, device)
     
     with torch.no_grad():
         gp.eval()
@@ -86,13 +86,13 @@ if __name__ == "__main__":
             out = convsout.reshape(nimg, imgsize, imgsize)
             combo = np.sin((t+1)/timesteps * np.pi/2)
             temp = (1-combo) * test + combo * out
-            '''
+            
             if t % 10 == 0:
                 print(t)
-                plt.imshow(out[0].detach().cpu().numpy())
+                plt.imshow(temp[0].detach().cpu().numpy())
                 plt.colorbar()
                 plt.show()
-            '''
+            
         test = temp
         for i in range(test.size(0)):
             img = test[i].view(imgsize, imgsize).detach().cpu().numpy()
