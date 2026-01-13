@@ -36,7 +36,7 @@ class MuyGP(nn.Module):
             _, neighbors = torch.topk(dists, self.nn, largest=False, dim=1)
             nX = self.trainX[neighbors]
             ny = self.trainy[neighbors]
-            print(_[:,0])
+            #print(_[:,0])
             #plt.imshow(self.trainy[neighbors[0,0]].view(5,5).detach().cpu().numpy())
             #plt.show()
         ny = ny + 1e-2 * torch.randn_like(ny) - ymean

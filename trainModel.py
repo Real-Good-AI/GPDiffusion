@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 timesteps = 100
 kernel = 13 #MUST be odd, otherwise there's no center pixel
 imgsize = 64
-nimg = 2
+nimg = 4
 dilation = 1
 
 def trainModel(loader, gp, device):
