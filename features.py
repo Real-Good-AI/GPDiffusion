@@ -25,8 +25,8 @@ class FlowDataset(Dataset):
             T.Normalize((0.5,), (0.5,))
         ])
         '''
-        #dataset = torchvision.datasets.MNIST(root="./data", train=train, download=True, transform=transform)
-        dataset = torchvision.datasets.FashionMNIST(root="./data", train=train, download=True, transform=transform)
+        dataset = torchvision.datasets.MNIST(root="./data", train=train, download=True, transform=transform)
+        #dataset = torchvision.datasets.FashionMNIST(root="./data", train=train, download=True, transform=transform)
         #dataset = torchvision.datasets.SVHN(root="./data", split=keyword, download=True, transform=transform)
         images = torch.zeros((maxsize, imgsize, imgsize))
         i = 0
@@ -54,7 +54,8 @@ class FlowDataset(Dataset):
         noise = torch.randn_like(drawnslices)
         beta = Beta(2., 1.)
         interp = beta.sample((maxsize*imgsize*imgsize, 1))
-        self.x = interp * drawnslices + (1-interp) * noise
+        pos = 2*idx[:,1:]/imgsize - 1.
+        self.x = torch.hstack((interp * drawnslices + (1-interp) * noise, 5*pos))
         
     def __len__(self):
         return self.x.size(0)

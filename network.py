@@ -9,16 +9,19 @@ class MuyGP(nn.Module):
         self.trainX = None
         self.trainy = None
         self.ymean = None
-        self.l = nn.Parameter(torch.tensor(2.5))
-        self.a = nn.Parameter(torch.tensor(0.5))
+        self.l = nn.Parameter(2*torch.ones((1, inDim+2)))
+        #self.l = nn.Parameter(torch.tensor(3.5))
+        self.a = nn.Parameter(torch.tensor(0.45))
         self.nn = 128
 
     def kernel(self, A, B):
+        A = A / self.l
+        B = B / self.l
         d = torch.cdist(A, B)
         d = d / np.sqrt(A.size(-1))
         #val = self.a * torch.exp(-(d ** 2) / (2. * self.l ** 2))
         #val = self.a * (1 + np.sqrt(3) * d / self.l) * torch.exp(-np.sqrt(3) * d / self.l)
-        val = self.a * torch.exp(-d / self.l)
+        val = self.a * torch.exp(-d)
         return val
 
     def forward(self, x):
