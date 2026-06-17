@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import torchvision.transforms as T
 from torch.utils.data import Dataset
 from torch.distributions import Beta
+from random import shuffle
 
 class FlowDataset(Dataset):
     def __init__(self, t=10, maxsize=2000, kernel=5, train=True, dilation=1):
@@ -14,6 +15,7 @@ class FlowDataset(Dataset):
             T.ToTensor(),
             T.Normalize((0.5,), (0.5,))
         ])
+        
         '''
         if train:
             keyword = "train"
@@ -35,27 +37,40 @@ class FlowDataset(Dataset):
             i += 1
             if i >= maxsize:
                 break
-            if i % 1000 == 0:
-                #plt.imshow(images[i-1].numpy())
+            if i % 10000 == 0:
+                plt.axis("off")
+                plt.imshow(images[i-1].numpy(), cmap="gray")
                 #plt.colorbar()
-                #plt.show()
+                plt.show()
                 print(i)
         
         effsize = (kernel-1) * dilation + 1
         padding = effsize // 2
-        padimages = F.pad(images,(padding, padding, padding, padding))
+        padimages = F.pad(images,(padding, padding, padding, padding), value=-1.)
         
         idx = torch.cartesian_prod(torch.arange(maxsize), torch.arange(imgsize), torch.arange(imgsize))
-        self.y = images[idx[:,0], idx[:,1], idx[:,2]].unsqueeze(1)
         drawnslices = torch.stack([
             padimages[idx[i,0], idx[i,1]:idx[i,1]+effsize:dilation, idx[i,2]:idx[i,2]+effsize:dilation]
             for i in range(idx.size(0))
         ]).reshape(maxsize*imgsize*imgsize, kernel*kernel)
-        noise = torch.randn_like(drawnslices)
-        beta = Beta(2., 1.)
-        interp = beta.sample((maxsize*imgsize*imgsize, 1))
-        pos = 2*idx[:,1:]/imgsize - 1.
-        self.x = torch.hstack((interp * drawnslices + (1-interp) * noise, 5*pos))
+        pos = (2*idx[:,1:]/imgsize - 1.)
+        drawnslices = torch.hstack((drawnslices, 5*pos))
+        drawnslices = torch.unique(drawnslices, dim=0)
+        self.y = drawnslices[:, (kernel*kernel-1) // 2].unsqueeze(-1)
+        print(self.y.size())
+        noise = torch.randn_like(drawnslices[:,:-2])
+        if train:
+            beta = Beta(1., 1.)
+        else:
+            beta = Beta(1., 1.)
+        interp = beta.sample((drawnslices.size(0), 1))
+        self.denoise = drawnslices
+        self.x = torch.hstack((torch.sqrt(interp) * drawnslices[:,:-2] + torch.sqrt(1-interp) * noise, drawnslices[:,-2:]))
+        print(self.x.size())
+        #for thing in self.x[torch.randperm(self.x.size(0))]:
+            #plt.axis("off")
+            #plt.imshow(thing[:-2].view(kernel, kernel), cmap="gray")
+            #plt.show()
         
     def __len__(self):
         return self.x.size(0)

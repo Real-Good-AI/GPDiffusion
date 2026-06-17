@@ -1,54 +1,55 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import matplotlib.pyplot as plt
+import torch.nn.functional as F
 
 class MuyGP(nn.Module):
-    def __init__(self, inDim, outDim):
+    def __init__(self, inDim):
         super().__init__()
         self.trainX = None
         self.trainy = None
         self.ymean = None
-        self.l = nn.Parameter(2*torch.ones((1, inDim+2)))
-        #self.l = nn.Parameter(torch.tensor(3.5))
-        self.a = nn.Parameter(torch.tensor(0.45))
+        #self.l = nn.Parameter(torch.zeros((1, inDim)))
+        self.a = torch.tensor(0.)
+        #self.a = nn.Parameter(torch.tensor(0.))
+        self.t = nn.Parameter(torch.tensor(0.))
+        self.l = nn.Parameter(torch.tensor(0.))
         self.nn = 128
 
     def kernel(self, A, B):
-        A = A / self.l
-        B = B / self.l
+        l = torch.exp(self.l)
+        A = A / l
+        B = B / l
         d = torch.cdist(A, B)
         d = d / np.sqrt(A.size(-1))
-        #val = self.a * torch.exp(-(d ** 2) / (2. * self.l ** 2))
-        #val = self.a * (1 + np.sqrt(3) * d / self.l) * torch.exp(-np.sqrt(3) * d / self.l)
-        val = self.a * torch.exp(-d)
+        #val = torch.exp(-d)
+        val = torch.exp(-(d ** 2)/2)
         return val
 
     def forward(self, x):
-        #ymean = self.ymean(x).unsqueeze(1)
+        l = torch.exp(self.l)
+        t = torch.exp(self.t)
         ymean = self.ymean
-        dists = torch.cdist(x, self.trainX)
+        dists = torch.cdist(x/l, self.trainX/l)
         if self.training:
             _, neighbors = torch.topk(dists, self.nn+1, largest=False, dim=1)
             nX = self.trainX[neighbors[:,1:]]
-            ny = self.trainy[neighbors[:,1:]]
+            ny = self.trainy[neighbors[:,1:]] - ymean
         else:
             _, neighbors = torch.topk(dists, self.nn, largest=False, dim=1)
             nX = self.trainX[neighbors]
-            ny = self.trainy[neighbors]
-            #print(_[:,0])
-            #plt.imshow(self.trainy[neighbors[0,0]].view(5,5).detach().cpu().numpy())
-            #plt.show()
-        ny = ny + 1e-2 * torch.randn_like(ny) - ymean
-        auto = self.kernel(nX, nX)
+            ny = self.trainy[neighbors] - ymean
+        auto = self.kernel(nX, nX) + t * torch.eye(self.nn, device=nX.device).unsqueeze(0)
         autoCov = torch.linalg.inv(auto)
         crossCov = self.kernel(x.unsqueeze(1), nX)
         kWeights = crossCov @ autoCov
+        a = (ny.transpose(-2, -1) @ autoCov @ ny).mean()
+        self.a = torch.log(a)
+        #a = torch.exp(self.a)
         y = kWeights @ ny
-        yVar = self.a * torch.ones(x.size(0), device=x.device) - \
-            (kWeights @ crossCov.transpose(1, 2)).squeeze()
-        return (y + ymean).squeeze(1), yVar
-
+        yVar = self.kernel(x.unsqueeze(1), x.unsqueeze(1)) - \
+            (kWeights @ crossCov.transpose(1, 2))
+        return (y + ymean).squeeze(1), a * torch.clamp(yVar.squeeze(), min=1e-10)
 
 class NN(nn.Module):
     def __init__(self, inDim, outDim):
